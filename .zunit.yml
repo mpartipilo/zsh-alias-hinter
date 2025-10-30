@@ -1,0 +1,10 @@
+# ZUnit configuration
+directories:
+  tests: tests
+  output: tests/_output
+  support: tests/_support
+tap: false
+verbose: true
+time: true
+output-text: true
+allow-risky: true

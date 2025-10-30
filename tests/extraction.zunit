@@ -1,0 +1,263 @@
+#!/usr/bin/env zunit
+
+# Load the plugin
+@setup {
+    # Create test aliases
+        # Use mock mode for test aliases
+        export ZSH_ALIAS_HINTER_MOCK_MODE=1
+        export ZSH_ALIAS_HINTER_MOCK_ALIAS_OUTPUT="testcmd='echo test'
+gsw='git switch'
+gst='git status'
+ll='ls -la'"
+        _zsh_alias_hinter_build_cache
+        export ZSH_ALIAS_HINTER_DEBUG=1
+        source "${PWD}/zsh-alias-hinter-debug.zsh"
+}
+
+@test 'Plugin loads successfully' {
+    assert $? equals 0
+}
+
+@test 'Cache is built on load' {
+    run _zsh_alias_hinter_build_cache
+    assert $state equals 0
+    # Check that cache has at least one entry
+    local cache_size=${#_ZSH_ALIAS_HINTER_CACHE_NAMES[@]}
+    assert $cache_size is_greater_than 0
+}
+
+@test 'Test alias exists in cache' {
+    assert "${_ZSH_ALIAS_HINTER_CACHE[testcmd]}" same_as "echo test"
+}
+
+@test 'Extract last command: single command' {
+    local input="gsw"
+    local current_command="$input"
+    
+    # Trim whitespace
+    current_command="${current_command##[[:space:]]##}"
+    current_command="${current_command%%[[:space:]]##}"
+    
+    # Extract last command
+    local last_cmd="$current_command"
+    local temp_cmd=""
+    
+    # Check for &&
+    if [[ "$current_command" == *"&&"* ]]; then
+        temp_cmd="${current_command##*&&}"
+        temp_cmd="${temp_cmd##[[:space:]]##}"
+        temp_cmd="${temp_cmd%%[[:space:]]##}"
+        if [[ ${#temp_cmd} -le ${#last_cmd} ]]; then
+            last_cmd="$temp_cmd"
+        fi
+    fi
+    
+    # Extract command name
+    local cmd_name="${last_cmd%% *}"
+    cmd_name="${cmd_name##[[:space:]]##}"
+    cmd_name="${cmd_name%%[[:space:]]##}"
+    
+    assert "$cmd_name" same_as "gsw"
+}
+
+@test 'Extract last command: with && and no spaces' {
+    local input="gsw &&gsw"
+    local current_command="$input"
+    
+    # Trim whitespace
+    current_command="${current_command##[[:space:]]##}"
+    current_command="${current_command%%[[:space:]]##}"
+    
+    # Extract last command
+    local last_cmd="$current_command"
+    local temp_cmd=""
+    
+    # Check for &&
+    if [[ "$current_command" == *"&&"* ]]; then
+        temp_cmd="${current_command##*&&}"
+        temp_cmd="${temp_cmd##[[:space:]]##}"
+        temp_cmd="${temp_cmd%%[[:space:]]##}"
+        if [[ ${#temp_cmd} -le ${#last_cmd} ]]; then
+            last_cmd="$temp_cmd"
+        fi
+    fi
+    
+    # Extract command name
+    local cmd_name="${last_cmd%% *}"
+    cmd_name="${cmd_name##[[:space:]]##}"
+    cmd_name="${cmd_name%%[[:space:]]##}"
+    
+    assert "$cmd_name" same_as "gsw"
+    assert ${#cmd_name} equals 3
+}
+
+@test 'Extract last command: with && and spaces' {
+    local input="gsw && gsw"
+    local current_command="$input"
+    
+    # Trim whitespace
+    current_command="${current_command##[[:space:]]##}"
+    current_command="${current_command%%[[:space:]]##}"
+    
+    # Extract last command
+    local last_cmd="$current_command"
+    local temp_cmd=""
+    
+    # Check for &&
+    if [[ "$current_command" == *"&&"* ]]; then
+        temp_cmd="${current_command##*&&}"
+        temp_cmd="${temp_cmd##[[:space:]]##}"
+        temp_cmd="${temp_cmd%%[[:space:]]##}"
+        if [[ ${#temp_cmd} -le ${#last_cmd} ]]; then
+            last_cmd="$temp_cmd"
+        fi
+    fi
+    
+    # Extract command name
+    local cmd_name="${last_cmd%% *}"
+    cmd_name="${cmd_name##[[:space:]]##}"
+    cmd_name="${cmd_name%%[[:space:]]##}"
+    
+    assert "$cmd_name" same_as "gsw"
+    assert ${#cmd_name} equals 3
+}
+
+@test 'Extract last command: multiple commands with semicolon' {
+    local input="echo test; gsw"
+    local current_command="$input"
+    
+    # Trim whitespace
+    current_command="${current_command##[[:space:]]##}"
+    current_command="${current_command%%[[:space:]]##}"
+    
+    # Extract last command
+    local last_cmd="$current_command"
+    local temp_cmd=""
+    
+    # Check for semicolon
+    if [[ "$current_command" == *";"* ]]; then
+        temp_cmd="${current_command##*;}"
+        temp_cmd="${temp_cmd##[[:space:]]##}"
+        temp_cmd="${temp_cmd%%[[:space:]]##}"
+        last_cmd="$temp_cmd"
+    fi
+    
+    # Extract command name
+    local cmd_name="${last_cmd%% *}"
+    cmd_name="${cmd_name##[[:space:]]##}"
+    cmd_name="${cmd_name%%[[:space:]]##}"
+    
+    assert "$cmd_name" same_as "gsw"
+}
+
+@test 'Extract last command: with pipe' {
+    local input="echo test | gsw"
+    local current_command="$input"
+    
+    # Trim whitespace
+    current_command="${current_command##[[:space:]]##}"
+    current_command="${current_command%%[[:space:]]##}"
+    
+    # Extract last command
+    local last_cmd="$current_command"
+    local temp_cmd=""
+    
+    # Check for pipe
+    if [[ "$current_command" == *"|"* && "$current_command" != *"||"* ]]; then
+        temp_cmd="${current_command##*|}"
+        temp_cmd="${temp_cmd##[[:space:]]##}"
+        temp_cmd="${temp_cmd%%[[:space:]]##}"
+        if [[ ${#temp_cmd} -le ${#last_cmd} ]]; then
+            last_cmd="$temp_cmd"
+        fi
+    fi
+    
+    # Extract command name
+    local cmd_name="${last_cmd%% *}"
+    cmd_name="${cmd_name##[[:space:]]##}"
+    cmd_name="${cmd_name%%[[:space:]]##}"
+    
+    assert "$cmd_name" same_as "gsw"
+}
+
+@test 'Command name lookup in cache' {
+    _zsh_alias_hinter_build_cache
+    local cmd_name="gsw"
+    # Log cache contents for debug
+    for key in ${(k)_ZSH_ALIAS_HINTER_CACHE}; do
+        local value=${_ZSH_ALIAS_HINTER_CACHE[$key]}
+        _zsh_alias_hinter_debug "Cache key: $key -> $value"
+    done
+    local found=0
+    if [[ -n ${_ZSH_ALIAS_HINTER_CACHE[$cmd_name]} ]]; then
+        found=1
+    fi
+    _zsh_alias_hinter_debug "Lookup for '$cmd_name': ${_ZSH_ALIAS_HINTER_CACHE[$cmd_name]} (found=$found)"
+    assert $found equals 1
+}
+
+@test 'findalias function works' {
+    run findalias "git"
+    assert $state equals 0
+}
+
+@test 'Trailing spaces are trimmed' {
+    local input="gsw   "
+    local cmd_name="$input"
+    cmd_name="${cmd_name##[[:space:]]##}"
+    cmd_name="${cmd_name%%[[:space:]]##}"
+    
+    assert "$cmd_name" same_as "gsw"
+    assert ${#cmd_name} equals 3
+}
+
+@test 'Leading spaces are trimmed' {
+    local input="   gsw"
+    local cmd_name="$input"
+    cmd_name="${cmd_name##[[:space:]]##}"
+    cmd_name="${cmd_name%%[[:space:]]##}"
+    
+    assert "$cmd_name" same_as "gsw"
+    assert ${#cmd_name} equals 3
+}
+
+@test 'Extract with arguments after alias' {
+    local input="gsw main"
+    local cmd_name="${input%% *}"
+    cmd_name="${cmd_name##[[:space:]]##}"
+    cmd_name="${cmd_name%%[[:space:]]##}"
+    
+    assert "$cmd_name" same_as "gsw"
+    assert ${#cmd_name} equals 3
+}
+
+@test 'Extract with && and arguments' {
+    local input="echo test && gsw main"
+    local current_command="$input"
+    
+    # Trim whitespace
+    current_command="${current_command##[[:space:]]##}"
+    current_command="${current_command%%[[:space:]]##}"
+    
+    # Extract last command
+    local last_cmd="$current_command"
+    local temp_cmd=""
+    
+    # Check for &&
+    if [[ "$current_command" == *"&&"* ]]; then
+        temp_cmd="${current_command##*&&}"
+        temp_cmd="${temp_cmd##[[:space:]]##}"
+        temp_cmd="${temp_cmd%%[[:space:]]##}"
+        if [[ ${#temp_cmd} -le ${#last_cmd} ]]; then
+            last_cmd="$temp_cmd"
+        fi
+    fi
+    
+    # Extract command name
+    local cmd_name="${last_cmd%% *}"
+    cmd_name="${cmd_name##[[:space:]]##}"
+    cmd_name="${cmd_name%%[[:space:]]##}"
+    
+    assert "$cmd_name" same_as "gsw"
+    assert "$last_cmd" same_as "gsw main"
+}

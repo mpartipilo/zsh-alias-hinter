@@ -1,0 +1,51 @@
+#!/usr/bin/env zsh
+
+# Bootstrap file for zunit tests
+# This is sourced before any tests run
+
+echo "Bootstrap: Starting"
+
+# Get the directory where this bootstrap file is located
+BOOTSTRAP_DIR="${0:A:h}"
+# Get the directory where the tests are located
+TESTS_DIR="${BOOTSTRAP_DIR:h}"
+# Go up two levels (from tests/_support to project root)
+PROJECT_ROOT="${BOOTSTRAP_DIR:h:h}"
+
+# For testing, we only need the core functionality
+CORE_FILE="${PROJECT_ROOT}/zsh-alias-hinter-core.zsh"
+
+echo "Bootstrap: Looking for $CORE_FILE"
+
+if [[ -f "$CORE_FILE" ]]; then
+    source "$CORE_FILE"
+    echo "Bootstrap: Core module sourced"
+    # Verify a function exists
+    if typeset -f _zsh_alias_hinter_build_cache >/dev/null; then
+        echo "Bootstrap: _zsh_alias_hinter_build_cache function is available"
+    else
+        echo "Bootstrap: ERROR - _zsh_alias_hinter_build_cache function not found"
+    fi
+else
+    echo "Bootstrap: ERROR - Core file not found"
+fi
+
+DEBUG_LOG_FILE="${ZSH_ALIAS_HINTER_DEBUG_LOG:-${TESTS_DIR}/_output/debug.log}"
+export ZSH_ALIAS_HINTER_DEBUG_LOG="$DEBUG_LOG_FILE"
+
+# Ensure a new log file is created at the start of each batch test run
+if [[ -f "$DEBUG_LOG_FILE" ]]; then
+    echo "Bootstrap: Overwriting existing debug log file at $DEBUG_LOG_FILE"
+    rm "$DEBUG_LOG_FILE"
+fi
+touch "$DEBUG_LOG_FILE"
+echo "Bootstrap: Created new debug log file at $DEBUG_LOG_FILE"
+
+DEBUG_MODULE_FILE="${PROJECT_ROOT}/zsh-alias-hinter-debug.zsh"
+if [[ -f "$DEBUG_MODULE_FILE" ]]; then
+    ZSH_ALIAS_HINTER_DEBUG=1
+    source "$DEBUG_MODULE_FILE"
+    echo "Bootstrap: Debug module sourced with ZSH_ALIAS_HINTER_DEBUG=$ZSH_ALIAS_HINTER_DEBUG, LOG=$ZSH_ALIAS_HINTER_DEBUG_LOG"
+else
+    echo "Bootstrap: ERROR - Debug module not found"
+fi

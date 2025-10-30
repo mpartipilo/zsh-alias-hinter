@@ -1,0 +1,45 @@
+#!/usr/bin/env zunit
+
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+@test '_zsh_alias_hinter_replace_current_command replaces last segment (single command)' {
+    source "$PROJECT_ROOT/zsh-alias-hinter-core.zsh"
+    BUFFER='git switch'
+    _zsh_alias_hinter_replace_current_command 'gsw'
+    assert "$BUFFER" equals 'gsw'
+}
+
+@test '_zsh_alias_hinter_replace_current_command replaces last segment after semicolon' {
+    source "$PROJECT_ROOT/zsh-alias-hinter-core.zsh"
+    BUFFER='echo test; git switch'
+    _zsh_alias_hinter_replace_current_command 'gsw'
+    assert "$BUFFER" same_as "echo test; gsw"
+}
+
+@test '_zsh_alias_hinter_replace_current_command replaces last segment after &&' {
+    source "$PROJECT_ROOT/zsh-alias-hinter-core.zsh"
+    BUFFER='echo test && git switch'
+    _zsh_alias_hinter_replace_current_command 'gsw'
+    assert "$BUFFER" same_as "echo test && gsw"
+}
+
+@test '_zsh_alias_hinter_replace_current_command replaces last segment after ||' {
+    source "$PROJECT_ROOT/zsh-alias-hinter-core.zsh"
+    BUFFER='echo test || git switch'
+    _zsh_alias_hinter_replace_current_command 'gsw'
+    assert "$BUFFER" same_as "echo test || gsw"
+}
+
+@test '_zsh_alias_hinter_replace_current_command replaces last segment after |' {
+    source "$PROJECT_ROOT/zsh-alias-hinter-core.zsh"
+    BUFFER='echo test | git switch'
+    _zsh_alias_hinter_replace_current_command 'gsw'
+    assert "$BUFFER" same_as "echo test | gsw"
+}
+
+@test '_zsh_alias_hinter_replace_current_command preserves whitespace after separator' {
+    source "$PROJECT_ROOT/zsh-alias-hinter-core.zsh"
+    BUFFER='echo test;   git switch'
+    _zsh_alias_hinter_replace_current_command 'gsw'
+    assert "$BUFFER" same_as "echo test;   gsw"
+}
