@@ -13,10 +13,7 @@ ZSH Alias Hinter automatically detects your defined aliases and offers:
 - **Completion List:** Displays a list of matching aliases below the prompt, with descriptions, as you type.
 - **Cycling:** Lets you cycle through available alias matches with a keybinding (default: Ctrl+N).
 - **FZF Integration:** Interactive fuzzy search and selection of aliases using fzf (default key: Ctrl+F).
-- **Space Reservation:** Prevents prompt scrolling by reserving space for alias hints.
-- **Expansion Truncation:** Truncates long alias expansions to fit your terminal width.
-- **Debug Logging:** Optional debug output to `/tmp/zsh-alias-hinter-debug.log` for troubleshooting.
-
+- 
 ---
 
 ## Module Overview
