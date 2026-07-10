@@ -11,12 +11,18 @@
 
 # Track inline display state
 typeset -g _ZSH_ALIAS_HINTER_INLINE_VISIBLE=0
+typeset -g _ZSH_ALIAS_HINTER_INLINE_HL=""  # Exact region_highlight entry we added
 
 # Function to clear inline expansion hint
 _zsh_alias_hinter_clear_inline() {
     if [[ $_ZSH_ALIAS_HINTER_INLINE_VISIBLE -eq 1 ]]; then
+        _zsh_alias_hinter_debug "inline: clearing POSTDISPLAY='$POSTDISPLAY'"
         POSTDISPLAY=""
-        region_highlight=("${(@)region_highlight:#*->*}")  # Remove our highlights
+        # Remove only the exact highlight entry we added
+        if [[ -n "$_ZSH_ALIAS_HINTER_INLINE_HL" ]]; then
+            region_highlight=("${(@)region_highlight:#$_ZSH_ALIAS_HINTER_INLINE_HL}")
+        fi
+        _ZSH_ALIAS_HINTER_INLINE_HL=""
         _ZSH_ALIAS_HINTER_INLINE_VISIBLE=0
     fi
 }
@@ -57,11 +63,13 @@ _zsh_alias_hinter_show_inline() {
     if (( spaces > 5 )); then
         # Use POSTDISPLAY to show the hint
         POSTDISPLAY="$hint_text"
+        _zsh_alias_hinter_debug "inline: set POSTDISPLAY='$hint_text' for BUFFER='$BUFFER'"
         
         # Use region_highlight to color it
         local suggestion_start=$buffer_len
         local suggestion_end=$((buffer_len + ${#hint_text}))
-        region_highlight+=("$suggestion_start $suggestion_end fg=${ZSH_ALIAS_HINTER_INLINE_COLOR}")
+        _ZSH_ALIAS_HINTER_INLINE_HL="$suggestion_start $suggestion_end fg=${ZSH_ALIAS_HINTER_INLINE_COLOR}"
+        region_highlight+=("$_ZSH_ALIAS_HINTER_INLINE_HL")
         
         _ZSH_ALIAS_HINTER_INLINE_VISIBLE=1
     fi
@@ -71,28 +79,34 @@ _zsh_alias_hinter_update_inline() {
     # Skip if inline display is disabled
     [[ $ZSH_ALIAS_HINTER_INLINE_ENABLED -eq 0 ]] && return
 
-    # Get the current command
-    local cmd_name="$(_zsh_alias_hinter_extract_current_command)"
-
-    # Return if empty or too short
-    if [[ -z "$cmd_name" ]] || [[ ${#cmd_name} -lt $ZSH_ALIAS_HINTER_INLINE_MIN_CHARS ]]; then
-        _zsh_alias_hinter_clear_inline
-        return
-    fi
-
     # Check if cache is populated, build if needed
     if [[ ${#_ZSH_ALIAS_HINTER_CACHE_NAMES[@]} -eq 0 ]]; then
         _zsh_alias_hinter_build_cache
     fi
 
-    # Use new core function for exact alias match
-    if _zsh_alias_hinter_is_exact_alias_match "$cmd_name"; then
-        # Exact alias match found - show inline expansion
-        _zsh_alias_hinter_show_inline "$cmd_name" "${_ZSH_ALIAS_HINTER_CACHE[$cmd_name]}"
-    else
-        # No match, clear any existing inline hint
-        _zsh_alias_hinter_clear_inline
+    # Forward direction: the typed command IS an alias name -> show its expansion
+    # e.g. typing "gsw" shows "gsw → git switch"
+    local cmd_name="$(_zsh_alias_hinter_extract_current_command)"
+    if [[ -n "$cmd_name" ]] && [[ ${#cmd_name} -ge $ZSH_ALIAS_HINTER_INLINE_MIN_CHARS ]]; then
+        if _zsh_alias_hinter_is_exact_alias_match "$cmd_name"; then
+            _zsh_alias_hinter_show_inline "$cmd_name" "${_ZSH_ALIAS_HINTER_CACHE[$cmd_name]}"
+            return
+        fi
     fi
+
+    # Reverse direction: the typed command matches an alias expansion -> suggest the alias
+    # e.g. typing "git switch" shows "git switch → gsw"
+    local segment="$(_zsh_alias_hinter_extract_last_command_segment)"
+    if [[ -n "$segment" ]] && [[ ${#segment} -ge $ZSH_ALIAS_HINTER_INLINE_MIN_CHARS ]]; then
+        _zsh_alias_hinter_get_matching_aliases "$segment" 1 >/dev/null
+        if [[ ${#_ZSH_ALIAS_HINTER_MATCHES[@]} -gt 0 ]]; then
+            _zsh_alias_hinter_show_inline "$segment" "${_ZSH_ALIAS_HINTER_MATCHES[1]}"
+            return
+        fi
+    fi
+
+    # No match in either direction, clear any existing inline hint
+    _zsh_alias_hinter_clear_inline
 }
 
 # ZLE widget to update inline display
